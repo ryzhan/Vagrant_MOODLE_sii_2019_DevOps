@@ -1,1 +1,0 @@
-{"rsync":{"/vagrant":{"type":"rsync","guestpath":"/vagrant","hostpath":"/home/erkek/Summer_practice_Softserve/Vagrant_MOODLE_sii_2019_DevOps","disabled":false,"__vagrantfile":true,"owner":"vagrant","group":"vagrant"}}}
