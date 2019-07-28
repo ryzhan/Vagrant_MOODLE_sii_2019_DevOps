@@ -5,6 +5,7 @@
 
 DB_ROOT_PWD='bubuntu'
 
+setenforce permissive
 echo "<<<<<<<<<<<<<<<<<< Update system >>>>>>>>>>>>>>>>>>>>"
 yum update -y
 echo "<<<<<<<<<<<<<<<<<< Install Vim >>>>>>>>>>>>>>>>>>>>"
@@ -16,6 +17,22 @@ rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm
 rpm -Uvh http://repo.mysql.com/mysql-community-release-el7-7.noarch.rpm
 echo "<<<<<<<<<<<<<<<<<< Install PHP 7.2 >>>>>>>>>>>>>>>>>>>>"
 yum --enablerepo=remi-php72 install php php-mysql php-xml php-soap php-xmlrpc php-mbstring php-json php-gd php-mcrypt -y
+echo "<<<<<<<<<<<<<<<<<< Opcache php.ini >>>>>>>>>>>>>>>>>>>>"
+FILE="/etc/php.ini"
+/bin/cat <<EOM >$FILE
+zend_extension=/opt/remi/php72/root/usr/lib64/php/modules/opcache.so
+
+[opcache]
+opcache.enable = 1
+opcache.memory_consumption = 128
+opcache.max_accelerated_files = 10000
+opcache.revalidate_freq = 60
+
+opcache.use_cwd = 1
+opcache.validate_timestamps = 1
+opcache.save_comments = 1
+opcache.enable_file_override = 0
+EOM
 echo "<<<<<<<<<<<<<<<<<< Install and enable Apache >>>>>>>>>>>>>>>>>>>>"
 yum --enablerepo=epel,remi install httpd -y
 systemctl start httpd.service
@@ -33,13 +50,15 @@ DROP DATABASE IF EXISTS test;
 DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
 FLUSH PRIVILEGES;
 _EOF_
-systemctl restart mysqld.service
 systemctl enable mysqld.service
 echo "<<<<<<<<<<<<<<<<<< Check version Apache, PHP, MySql >>>>>>>>>>>>>>>>>>>>"
 httpd -v
 php -v
 mysql -V
+echo "<<<<<<<<<<<<<<<<<< Install other >>>>>>>>>>>>>>>>>>>>"
 yum install php72-php-fpm php72-php-gd php72-php-json php72-php-mbstring php72-php-mysqlnd php72-php-xml php72-php-xmlrpc php72-php-opcache -y
+yum-config-manager --enable remi-php72
+yum install php-pecl-zip php-intl -y
 systemctl restart httpd.service
 echo "<<<<<<<<<<<<<<<<<<  Install GIT  >>>>>>>>>>>>>>>>>>>>"
 yum install git -y
@@ -52,26 +71,45 @@ git checkout MOODLE_36_STABLE
 echo "<<<<<<<<<<<<<<<<<<  Copy  >>>>>>>>>>>>>>>>>>>>"
 cp -R /opt/moodle /var/www/html/
 echo "<<<<<<<<<<<<<<<<<< Make dir  >>>>>>>>>>>>>>>>>>>>"
-mkdir /var/moodledata
+mkdir /var/www/html/moodledata
 echo "<<<<<<<<<<<<<<<<<<  Permisions  >>>>>>>>>>>>>>>>>>>>"
 chmod -R 0755 /var/www/html/moodle
 chown -R apache.apache /var/www/html/moodle 
-chmod -R 777 /var/moodledata
-chown -R apache.apache /var/moodledata
+chmod -R 777 /var/www/html/moodledata
+chown -R apache.apache /var/www/html/moodledata
+echo "<<<<<<<<<<<<<<<<<< Create Mysql DB  >>>>>>>>>>>>>>>>>>>>"
 mysql -u root -p ${rootpasswd} -e "create database moodle;" <<EOF
 ${DB_ROOT_PWD}
 EOF
 mysql -u root -p ${rootpasswd} -e "grant all privileges on moodle.* to 'moodle'@'localhost' identified by 'redhat';" <<EOF
 ${DB_ROOT_PWD}
 EOF
+echo "<<<<<<<<<<<<<<<<<< Mysql Fix  >>>>>>>>>>>>>>>>>>>>"
+FILE1="/etc/my.cnf"
+/bin/cat <<EOM >$FILE1
+[client]
+default-character-set = utf8mb4
+
+[mysqld]
+innodb_file_format = Barracuda
+innodb_file_per_table = 1
+innodb_large_prefix
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+skip-character-set-client-handshake
+
+[mysql]
+default-character-set = utf8mb4
+EOM
+systemctl restart mysqld.service
 echo "<<<<<<<<<<<<<<<<<<  Virtual host  >>>>>>>>>>>>>>>>>>>>"
-FILE="/etc/httpd/conf.d/moodle.techoism.com.conf"
-/bin/cat <<EOM >$FILE
+FILE2="/etc/httpd/conf.d/moodle.sii2019devops.com.conf"
+/bin/cat <<EOM >$FILE2
 <VirtualHost *:80>
- ServerName moodle.techoism.com
+ ServerName moodle.local
  DocumentRoot /var/www/html/moodle
- ErrorLog /var/log/httpd/moodle.techoism.com_error_log
- CustomLog /var/log/httpd/moodle.techoism.com_access_log combined 
+ ErrorLog /var/log/httpd/moodle.local_error_log
+ CustomLog /var/log/httpd/moodle.local_access_log combined 
  DirectoryIndex index.html index.htm index.php index.php4 index.php5
 <Directory /var/www/html/moodle>
  Options -Indexes +IncludesNOEXEC +SymLinksIfOwnerMatch
@@ -80,5 +118,9 @@ FILE="/etc/httpd/conf.d/moodle.techoism.com.conf"
 </Directory>
 </VirtualHost>
 EOM
+systemctl restart httpd.service
+echo "<<<<<<<<<<<<<<<<<<  CLI Instal Moodle  >>>>>>>>>>>>>>>>>>>>"
+/usr/bin/php /var/www/html/moodle/admin/cli/install.php --wwwroot='http://192.168.56.10' --dataroot='/var/www/html/moodledata' --dbtype='mariadb' --dbuser='root' --dbpass='bubuntu' --dbport='3306' --shortname='moodle' --adminuser='admin' --adminpass='bubuntu' --adminemail='admin@yo.lo' --fullname='moodle.local' --non-interactive --agree-license
+chmod o+r /var/www/html/moodle/config.php
 systemctl restart httpd.service
 echo "<<<<<<<<<<<<<<<<<<  End  >>>>>>>>>>>>>>>>>>>>"
