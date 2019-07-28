@@ -18,8 +18,8 @@ rpm -Uvh http://repo.mysql.com/mysql-community-release-el7-7.noarch.rpm
 echo "<<<<<<<<<<<<<<<<<< Install PHP 7.2 >>>>>>>>>>>>>>>>>>>>"
 yum --enablerepo=remi-php72 install php php-mysql php-xml php-soap php-xmlrpc php-mbstring php-json php-gd php-mcrypt -y
 echo "<<<<<<<<<<<<<<<<<< Opcache php.ini >>>>>>>>>>>>>>>>>>>>"
-FILE="/etc/php.ini"
-/bin/cat <<EOM >$FILE
+PATH_PHP_INI="/etc/php.ini"
+/bin/cat <<EOM >$PATH_PHP_INI
 zend_extension=/opt/remi/php72/root/usr/lib64/php/modules/opcache.so
 
 [opcache]
@@ -60,16 +60,12 @@ yum install php72-php-fpm php72-php-gd php72-php-json php72-php-mbstring php72-p
 yum-config-manager --enable remi-php72
 yum install php-pecl-zip php-intl -y
 systemctl restart httpd.service
-echo "<<<<<<<<<<<<<<<<<<  Install GIT  >>>>>>>>>>>>>>>>>>>>"
-yum install git -y
-cd /opt
-echo "<<<<<<<<<<<<<<<<<<  Clone MOODLE >>>>>>>>>>>>>>>>>>>>"
-git clone git://git.moodle.org/moodle.git
-cd moodle
-git branch --track MOODLE_36_STABLE origin/MOODLE_36_STABLE
-git checkout MOODLE_36_STABLE
-echo "<<<<<<<<<<<<<<<<<<  Copy  >>>>>>>>>>>>>>>>>>>>"
-cp -R /opt/moodle /var/www/html/
+echo "<<<<<<<<<<<<<<<<<<  Install wget  >>>>>>>>>>>>>>>>>>>>"
+yum install wget -y
+echo "<<<<<<<<<<<<<<<<<<  Download Moodle 3.7  >>>>>>>>>>>>>>>>>>>>"
+cd
+wget https://download.moodle.org/download.php/direct/stable37/moodle-3.7.1.tgz -q
+tar -zxvf moodle-3.7.1.tgz -C /var/www/html
 echo "<<<<<<<<<<<<<<<<<< Make dir  >>>>>>>>>>>>>>>>>>>>"
 mkdir /var/www/html/moodledata
 echo "<<<<<<<<<<<<<<<<<<  Permisions  >>>>>>>>>>>>>>>>>>>>"
@@ -85,8 +81,8 @@ mysql -u root -p ${rootpasswd} -e "grant all privileges on moodle.* to 'moodle'@
 ${DB_ROOT_PWD}
 EOF
 echo "<<<<<<<<<<<<<<<<<< Mysql Fix  >>>>>>>>>>>>>>>>>>>>"
-FILE1="/etc/my.cnf"
-/bin/cat <<EOM >$FILE1
+PATH_MYSQL_CONF="/etc/my.cnf"
+/bin/cat <<EOM >$PATH_MYSQL_CONF
 [client]
 default-character-set = utf8mb4
 
@@ -103,10 +99,10 @@ default-character-set = utf8mb4
 EOM
 systemctl restart mysqld.service
 echo "<<<<<<<<<<<<<<<<<<  Virtual host  >>>>>>>>>>>>>>>>>>>>"
-FILE2="/etc/httpd/conf.d/moodle.sii2019devops.com.conf"
-/bin/cat <<EOM >$FILE2
+PATH_VIRTUAL_HOST_CONF="/etc/httpd/conf.d/moodle.sii2019devops.com.conf"
+/bin/cat <<EOM >$PATH_VIRTUAL_HOST_CONF
 <VirtualHost *:80>
- ServerName moodle.local
+ ServerName moodle.local_sii2019devops
  DocumentRoot /var/www/html/moodle
  ErrorLog /var/log/httpd/moodle.local_error_log
  CustomLog /var/log/httpd/moodle.local_access_log combined 
@@ -120,7 +116,7 @@ FILE2="/etc/httpd/conf.d/moodle.sii2019devops.com.conf"
 EOM
 systemctl restart httpd.service
 echo "<<<<<<<<<<<<<<<<<<  CLI Instal Moodle  >>>>>>>>>>>>>>>>>>>>"
-/usr/bin/php /var/www/html/moodle/admin/cli/install.php --wwwroot='http://192.168.56.10' --dataroot='/var/www/html/moodledata' --dbtype='mariadb' --dbuser='root' --dbpass='bubuntu' --dbport='3306' --shortname='moodle' --adminuser='admin' --adminpass='bubuntu' --adminemail='admin@yo.lo' --fullname='moodle.local' --non-interactive --agree-license
+/usr/bin/php /var/www/html/moodle/admin/cli/install.php --wwwroot='http://192.168.56.10' --dataroot='/var/www/html/moodledata' --dbtype='mariadb' --dbuser='root' --dbpass='bubuntu' --dbport='3306' --shortname='moodle.local' --adminuser='admin' --adminpass='bubuntu' --adminemail='admin@yo.lo' --fullname='moodle.local_sii2019devops' --non-interactive --agree-license
 chmod o+r /var/www/html/moodle/config.php
 systemctl restart httpd.service
 echo "<<<<<<<<<<<<<<<<<<  End  >>>>>>>>>>>>>>>>>>>>"
